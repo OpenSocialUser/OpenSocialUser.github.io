@@ -9,41 +9,110 @@ function toObject(str) {
     return gadgets.json.parse(str);
 }
 
-function updateCountdown(){
+function updateCountdown() {
 	var state = wave.getState();
 
-	var clockType = document.getElementById('link_to_rss').value;
-    var digits = document.getElementById('link_to_rss').value;
-    var targetTime = parseInt(document.getElementById('entries_to_display').value);
+    var digits = "";
+    var targetTime = "";
+    var displayCircles = true;
 
-	if (rssLink != null && rssLink != "") {
-        if (entries_to_display != null && entries_to_display >= 1 && entries_to_display <= 25) {
-            document.getElementById('entries_to_display').value = '';
-            state.submitDelta({'entries_to_display' : entries_to_display});
-        } else {
-            document.getElementById('entries_to_display').value = '';
-            state.submitDelta({'entries_to_display' : 3});
+    var digitsRadio = $("input[type='radio'][name='digits']:checked");
+    if (digitsRadio.length > 0) {
+        digits = digitsRadio.val();
+    } else {
+        digits = "all";
+    }
+
+    targetTime = selectedDate;
+
+    var circlesCheckbox = $("input[type='checkbox'][name='circles']:checked");
+    if (circlesCheckbox.length > 0) {
+        displayCircles = true;
+    } else {
+        displayCircles = false;
+    }
+
+    circlesColor = $("#picker").val();
+    if (circlesColor == null || circlesColor == undefined || circlesColor == "") {
+        circlesColor == "40484F";
+    }
+
+    if (targetTime != null && targetTime != "") {
+        state.submitDelta({'digits' : digits});
+        state.submitDelta({'target_time' : targetTime});
+        state.submitDelta({'display_circles' : displayCircles});
+        state.submitDelta({'circles_color' : circlesColor});
+
+        drawCountdown(digits, targetTime, displayCircles, circlesColor);
+    } else {
+        renderEditPage();
+    }
+}
+
+function drawCountdown(digits, targetTime, displayCircles, circlesColor) {    
+    var html = "";
+    var htmlHeader = "";
+    var htmlFooter = "";
+
+    html += "<div id='countdown'></div>";
+
+    if (isOwner) {
+        htmlFooter += "<button id='editButton' onclick='renderEditPage()''>Edit</button>";
+    }
+
+    document.getElementById('body').innerHTML = html;
+    document.getElementById('footer').innerHTML = htmlFooter;
+    document.getElementById('header').innerHTML = htmlHeader;
+
+    $("#countdown").data("date", targetTime);
+
+    var showAllDigits = true;
+
+    if (digits != null && digits == "days") {
+        showAllDigits = false;
+    } else {
+        showAllDigits = true;
+    }
+
+    $("#countdown").TimeCircles({
+        "count_past_zero": false,
+        "animation": "smooth",
+        "bg_width": 0.2,
+        "fg_width": 0.03,
+        "circle_bg_color": "#90989F",
+        "time": {
+            "Days": {
+                "text": "Days",
+                "color": "#" + circlesColor,
+                "show": true
+            },
+            "Hours": {
+                "text": "Hours",
+                "color": "#" + circlesColor,
+                "show": showAllDigits
+            },
+            "Minutes": {
+                "text": "Minutes",
+                "color": "#" + circlesColor,
+                "show": showAllDigits
+            },
+            "Seconds": {
+                "text": "Seconds",
+                "color": "#" + circlesColor,
+                "show": showAllDigits
+            }
         }
-		document.getElementById('link_to_rss').value = '';
-		state.submitDelta({'rss_link' : rssLink});
-		requestRSS(rssLink);
-	}
-}
 
-function drawCountdown(clockType, targetTime, digits) {    
+    });
 
-}
+    if (displayCircles != null && !displayCircles) {
+        var canvas = $("#circlesCanvas");
+        canvas.hide();
 
-function normalizeDate(date) {
-	var dateString = "";
-	dateString += (date.getMonth() + 1).toString() + '/';
-	dateString += date.getDate().toString() + '/';
-	dateString += date.getFullYear().toString();
-	dateString += "  ";
-	dateString += date.getHours().toString() + ":";
-	dateString += date.getMinutes().toString();
+        var timeCirclesDiv = $(".time_circles").first();
 
-	return dateString;
+        timeCirclesDiv.css("height", canvas[0].height + "px");
+    }
 }
 
 function checkIfOwner() {
@@ -66,26 +135,14 @@ function checkIfOwner() {
 function renderEditPage() {
 	var state = wave.getState();
 
-	var clockType = state.get('clock_type');
     var targetTime = state.get('target_time');
     var digits = state.get('digits');
+    var displayCircles = state.get('display_circles');
+    var circlesColor = state.get('circles_color');
 
 	var html = "";
 	var htmlHeader = "";
 	var htmlFooter = "";
-
-	html += "<p style='font-size: 14px;'>Choose clock type:</p>";
-	if (clockType != null && clockType == "digital") {
-        html += "<input type='radio' name='clock_type' value='circle'>Circle</input>";
-        html += "</br>";
-		html += "<input type='radio' name='clock_type' value='digital' checked='true'>Digital</input>";
-	} else {
-        html += "<input type='radio' name='clock_type' value='circle' checked='true'>Circle</input>";
-        html += "</br>";
-        html += "<input type='radio' name='clock_type' value='digital'>Digital</input>";
-    }
-
-    html += "</br>";
 
     html += "<p style='font-size: 14px;'>Choose digits to display:</p>";
 
@@ -101,6 +158,26 @@ function renderEditPage() {
 
     html += "</br>";
 
+    html += "<p style='font-size: 14px;'>Countdown style:</p>";
+
+    if (displayCircles != null && displayCircles == false) {
+        html += "<input type='checkbox' name='circles' value='true'>Display circles</input>";
+    } else {
+        html += "<input type='checkbox' name='circles' value='true' checked='true'>Display circles</input>";
+    }
+
+    html += "</br>";
+
+    html += "<p style='font-size: 14px;'>Pick circle color:</p>";
+
+    if (circlesColor != null && circlesColor != "") {
+        html += "<input id='picker' class='color' value='" + circlesColor + "'/>";
+    } else {
+        html += "<input id='picker' class='color' value='40484F'/>";
+    }
+
+    html += "</br>";
+
     html += "<p style='font-size: 14px;'>Enter date for the Final Countdown:</p>";
 
     if (targetTime != null && targetTime != "") {
@@ -110,6 +187,7 @@ function renderEditPage() {
         html += "<input id='target_date_picker' type='text'/>";
     }
 
+    html += "</br>";
     html += "</br>";
 
     html += "<button id='saveButton' onclick='updateCountdown()''>Save</button>";
@@ -123,6 +201,8 @@ function renderEditPage() {
     html += ".";
     html += "</p>";
 
+    htmlHeader += "<h3>Settings:</h3>";
+
     document.getElementById('body').innerHTML = html;
     document.getElementById('footer').innerHTML = htmlFooter;
     document.getElementById('header').innerHTML = htmlHeader;
@@ -131,10 +211,12 @@ function renderEditPage() {
         inline:true,
         minDate: '-1970/01/01',
         onChangeDateTime:function(dp, $input){
-            alert($input.val());
             selectedDate = $input.val();
         }
     });
+
+    var colorPicker = new jscolor.color(document.getElementById('picker'), {});
+    colorPicker.fromString($("#picker").val());
 }
 
 function renderCountdown() {
@@ -142,14 +224,16 @@ function renderCountdown() {
         return;
     }
     var state = wave.getState();
-    var clockType = state.get('clock_type');
+
     var targetTime = state.get('target_time');
     var digits = state.get('digits');
+    var circlesColor = state.get('circles_color');
+    var displayCircles = state.get('display_circles');
 
     checkIfOwner();
 
-    if (clockType != null && clockType != "" && targetTime != null && digits != null) {
-    	drawCountdown(clockType, targetTime, digits);
+    if (targetTime != null && digits != null) {
+    	drawCountdown(digits, targetTime, displayCircles, circlesColor);
     } else {
         if (isOwner) {
     	   renderEditPage();

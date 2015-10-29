@@ -9,10 +9,15 @@
 }
 
 #header {
-	height: 30px;
+
 }
 
 #footer {
 	float: right;
 	margin-right: 10px;
+}
+
+#countdown {
+	width: 90%;
+	margin: 0 auto;
 }

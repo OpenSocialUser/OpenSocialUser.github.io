@@ -362,6 +362,7 @@
         
         // Create our canvas and set it to the appropriate size
         var canvasElement = document.createElement('canvas');
+        canvasElement.id = "circlesCanvas";
         canvasElement.width = width;
         canvasElement.height = height;
         

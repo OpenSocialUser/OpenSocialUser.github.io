@@ -66,6 +66,109 @@ function checkIfOwner() {
     });
 }
 
+function sanitize(text) {
+    var safeDiv = document.createElement("div");
+    safeDiv.innerHTML = text;
+
+    var scriptElements = safeDiv.getElementsByTagName("script");
+    for (var i = 0; i < scriptElements.length; i++) {
+        scriptElements[i].parentNode.removeChild(scriptElements[i]);
+    }
+
+    var childElements = safeDiv.children;
+    for (var i = 0; i < childElements.length; i++) {
+        childElements[i].removeAttribute("onclick");
+        childElements[i].removeAttribute("onload");
+        childElements[i].removeAttribute("onchange");
+
+        // a bit more inline js to remove
+        childElements[i].removeAttribute("onmousedown");
+        childElements[i].removeAttribute("onmouseenter");
+        childElements[i].removeAttribute("onmouseleave");
+        childElements[i].removeAttribute("onmousemove");
+        childElements[i].removeAttribute("onmouseover");
+        childElements[i].removeAttribute("onmouseout");
+        childElements[i].removeAttribute("onmouseup");
+        childElements[i].removeAttribute("oncontextmenu");
+        childElements[i].removeAttribute("ondblclick");
+        childElements[i].removeAttribute("onkeydown");
+        childElements[i].removeAttribute("onkeypress");
+        childElements[i].removeAttribute("onkeyup");
+        childElements[i].removeAttribute("onabort");
+        childElements[i].removeAttribute("onbeforeunload");
+        childElements[i].removeAttribute("onerror");
+        childElements[i].removeAttribute("onhashchange");
+        childElements[i].removeAttribute("onload");
+        childElements[i].removeAttribute("onpageshow");
+        childElements[i].removeAttribute("onpagehide");
+        childElements[i].removeAttribute("onresize");
+        childElements[i].removeAttribute("onscroll");
+        childElements[i].removeAttribute("onunload");
+        childElements[i].removeAttribute("onblur");
+        childElements[i].removeAttribute("onchange");
+        childElements[i].removeAttribute("onfocus");
+        childElements[i].removeAttribute("onfocusin");
+        childElements[i].removeAttribute("onfocusout");
+        childElements[i].removeAttribute("oninput");
+        childElements[i].removeAttribute("oninvalid");
+        childElements[i].removeAttribute("onreset");
+        childElements[i].removeAttribute("onsearch");
+        childElements[i].removeAttribute("onselect");
+        childElements[i].removeAttribute("onsubmit");
+        childElements[i].removeAttribute("ondrag");
+        childElements[i].removeAttribute("ondragend");
+        childElements[i].removeAttribute("ondragenter");
+        childElements[i].removeAttribute("ondragleave");
+        childElements[i].removeAttribute("ondragover");
+        childElements[i].removeAttribute("ondragstart");
+        childElements[i].removeAttribute("ondrop");
+        childElements[i].removeAttribute("oncopy");
+        childElements[i].removeAttribute("oncut");
+        childElements[i].removeAttribute("onpaste");
+        childElements[i].removeAttribute("onafterprint");
+        childElements[i].removeAttribute("onbeforeprint");
+        childElements[i].removeAttribute("onmessage");
+        childElements[i].removeAttribute("onopen");
+        childElements[i].removeAttribute("onwheel");
+        childElements[i].removeAttribute("ontoggle");
+        childElements[i].removeAttribute("onshow");
+        childElements[i].removeAttribute("ononline");
+        childElements[i].removeAttribute("onoffline");
+        childElements[i].removeAttribute("ontouchcancel");
+        childElements[i].removeAttribute("ontouchend");
+        childElements[i].removeAttribute("ontouchmove");
+        childElements[i].removeAttribute("ontouchstart");
+        childElements[i].removeAttribute("onpopstate");
+        childElements[i].removeAttribute("onstorage");
+        childElements[i].removeAttribute("transitionend");
+        childElements[i].removeAttribute("animationend");
+        childElements[i].removeAttribute("animationiteration");
+        childElements[i].removeAttribute("animationstart");
+        childElements[i].removeAttribute("oncanplay");
+        childElements[i].removeAttribute("oncanplaythrough");
+        childElements[i].removeAttribute("ondurationchange");
+        childElements[i].removeAttribute("onemptied");
+        childElements[i].removeAttribute("onended");
+        childElements[i].removeAttribute("onloadeddata");
+        childElements[i].removeAttribute("onloadedmetadata");
+        childElements[i].removeAttribute("onloadstart");
+        childElements[i].removeAttribute("onpause");
+        childElements[i].removeAttribute("onplay");
+        childElements[i].removeAttribute("onplaying");
+        childElements[i].removeAttribute("onprogress");
+        childElements[i].removeAttribute("onratechange");
+        childElements[i].removeAttribute("onseeked");
+        childElements[i].removeAttribute("onseeking");
+        childElements[i].removeAttribute("onstalled");
+        childElements[i].removeAttribute("onsuspend");
+        childElements[i].removeAttribute("ontimeupdate");
+        childElements[i].removeAttribute("onvolumechange");
+        childElements[i].removeAttribute("onwaiting");
+    }
+
+    return safeDiv.innerHTML;
+}
+
 function handleResponse(obj) { 
     var html = "";
     var htmlFooter = "";
@@ -74,10 +177,10 @@ function handleResponse(obj) {
     var rss = toObject(obj.text);
     rss["Entry"].forEach(function(entry){
     	html += "<div class='rssEntry'>";
-    	html += "<div class='entryTitle'>" + entry["Title"] + "</div>";
+    	html += "<div class='entryTitle'>" + sanitize(entry["Title"]) + "</div>";
     	var entryDate = new Date(entry["Date"]);
     	html += "<div class='entryDate'>" + normalizeDate(entryDate) + "</div>";
-    	html += "<a target='_blank' class='entryLink' href='" + entry["Link"] + "'>" + "Browse</a>";
+    	html += "<a target='_blank' class='entryLink' href='" + sanitize(entry["Link"]) + "'>" + "Browse</a>";
     	html += "</div>";
     });
 
@@ -85,8 +188,8 @@ function handleResponse(obj) {
         htmlFooter += "<button id='editButton' onclick='renderEditPage()''>Edit</button>";
     }
 
-    htmlHeader += "<div class='mainImageWrapper'><img class='mainImage' src='" + rss["Image"]["Url"] + "'></div>";
-    htmlHeader += "<a target='_blank' class='mainLink' href='" + rss["Link"] + "'>" + rss["Title"] + "</a>";
+    htmlHeader += "<div class='mainImageWrapper'><img class='mainImage' src='" + sanitize(rss["Image"]["Url"]) + "'></div>";
+    htmlHeader += "<a target='_blank' class='mainLink' href='" + sanitize(rss["Link"]) + "'>" + sanitize(rss["Title"]) + "</a>";
 
     document.getElementById('body').innerHTML = html;
     document.getElementById('footer').innerHTML = htmlFooter;
