@@ -61,7 +61,7 @@ function drawCountdown(digits, targetTime, displayCircles, circlesColor, readMor
 
     if (readMoreLink != null && readMoreLink != "") {
         html += "<div id='read_more'>";
-        html += "<a href='" + readMoreLink + "'>Read More</a>"
+        html += "<a target='_blank' href='" + readMoreLink + "'>Read More</a>"
         html += "</div>";
     }
 
@@ -196,6 +196,10 @@ function renderEditPage() {
     } else {
         html += "<input id='target_date_picker' type='text'/>";
     }
+
+    html += "</br>";
+
+    html += "<p style='font-size: 14px;'>Enter URL for 'Read More' link (if left empty the link won't be shown):</p>";
 
     if (readMoreLink != null && readMoreLink != "") {
         html += "<input id='read_more_link' type='text' value='" + readMoreLink + "'/>";
