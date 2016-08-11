@@ -1,4 +1,5 @@
 var isOwner = false;
+var linkCheck = null;
 
 function toJSON(obj) { 
 	return gadgets.json.stringify(obj); 
@@ -40,7 +41,6 @@ function renderEditPage() {
         html += "<select id='timeline_select'>";
         html += "<option value='saphybris'>@saphybris</option>";
         html += "<option value='SAPPHIRENOW'>@SAPPHIRENOW</option>";
-        html += "<option value='hybris_software'>@hybris_software</option>";
         html += "<option value='SAPSocial'>@SAPSocial</option>";
         html += "<option value='saphcp'>@saphcp</option>";
         html += "<option value='BillRMcDermott'>@BillRMcDermott</option>";
@@ -78,7 +78,6 @@ function saveTimeline() {
 function insertTimeline(timeline) {
     var saphybris = "<a class='twitter-timeline' href='https://twitter.com/saphybris' data-widget-id='727823334650593281'>Tweets by @saphybris</a>";
     var SAPPHIRENOW = "<a class='twitter-timeline' href='https://twitter.com/SAPPHIRENOW' data-widget-id='737250519270498305'>Tweets by @SAPPHIRENOW</a>";
-    var hybris_software = "<a class='twitter-timeline' href='https://twitter.com/hybris_software' data-widget-id='737250981742817280'>Tweets by @hybris_software</a>";
     var SAPSocial = "<a class='twitter-timeline' href='https://twitter.com/SAPSocial' data-widget-id='737251282608619520'>Tweets by @SAPSocial</a>";
     var saphcp = "<a class='twitter-timeline' href='https://twitter.com/saphcp' data-widget-id='737251552482693121'>Tweets by @saphcp</a>";
     var BillRMcDermott = "<a class='twitter-timeline' href='https://twitter.com/BillRMcDermott' data-widget-id='737251873682526208'>Tweets by @BillRMcDermott</a>";
@@ -94,8 +93,6 @@ function insertTimeline(timeline) {
         html += saphybris;
     } else if (timeline == "SAPPHIRENOW") {
         html += SAPPHIRENOW;
-    } else if (timeline == "hybris_software") {
-        html += hybris_software;
     } else if (timeline == "SAPSocial") {
         html += SAPSocial;
     } else if (timeline == "saphcp") {
@@ -116,6 +113,22 @@ function insertTimeline(timeline) {
     twttr.widgets.load(
         document.getElementById('body')
     );
+
+    if (linkCheck == null) {
+        linkCheck = setInterval(function() {
+            fixTwitterLinks();
+        }, 2000);
+    }
+}
+
+function fixTwitterLinks() {
+    var footers = document.getElementsByClassName('timeline-Footer');
+    for (i = 0; i < footers.length; i++) {
+        var links = footers[i].getElementsByTagName('a');
+        for (j = 0; j < links.length; j++) {
+            links[j].target = "_blank";
+        }
+    }
 }
 
 function renderTwitter() {
