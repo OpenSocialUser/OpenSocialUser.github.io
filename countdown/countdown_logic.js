@@ -57,7 +57,24 @@ function drawCountdown(digits, targetTime, displayCircles, circlesColor, readMor
     var htmlHeader = "";
     var htmlFooter = "";
 
-    html += "<div id='countdown'></div>";
+    var showAllDigits = true;
+
+    if (digits != null && digits == "days") {
+        showAllDigits = false;
+    } else {
+        showAllDigits = true;
+    }
+
+    if (showAllDigits) {
+        html += "<div id='countdown' style='width: 90%;'></div>";
+    } else {
+        if ($("#countdown_gadget").width() > 500) {
+            html += "<div id='countdown' style='width: 25%;'></div>";
+        } else {
+            html += "<div id='countdown' style='width: 90%;'></div>";
+        }
+    }
+    
 
     if (readMoreLink != null && readMoreLink != "") {
         html += "<div id='read_more'>";
@@ -74,14 +91,6 @@ function drawCountdown(digits, targetTime, displayCircles, circlesColor, readMor
     document.getElementById('header').innerHTML = htmlHeader;
 
     $("#countdown").data("date", targetTime);
-
-    var showAllDigits = true;
-
-    if (digits != null && digits == "days") {
-        showAllDigits = false;
-    } else {
-        showAllDigits = true;
-    }
 
     $("#countdown").TimeCircles({
         "count_past_zero": false,

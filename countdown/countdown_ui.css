@@ -22,7 +22,6 @@
 }
 
 #countdown {
-	width: 90%;
 	margin: 0 auto;
 }
 
@@ -33,4 +32,13 @@
 
 #read_more_link {
 	font-family: Arial;
+}
+
+#saveButton {
+	margin-left: 10px;
+	margin-top: 10px;
+}
+
+#cancelButton {
+	margin-left: 10px;
 }
