@@ -1,5 +1,6 @@
-var isOwner = false;
+var isOwner = null;
 var linkCheck = null;
+var isOnSave = false;
 
 function toJSON(obj) {
 	return gadgets.json.stringify(obj);
@@ -10,238 +11,295 @@ function toObject(str) {
 }
 
 function checkIfOwner() {
+    if (isOwner != null) return;
+
     var userId = null;
     var ownerId = null;
-
-    osapi.people.getViewer().execute(function(data) {
-        userId = data.id;
-
-        osapi.people.getOwner().execute(function(data) {
-            ownerId = data.id;
-            if (ownerId != null && userId != null && ownerId == userId) {
-                isOwner = true;
-            } else {
-                isOwner = false;
+    osapi.people.getOwner().execute(function(data) {
+        ownerId = data.id;
+        osapi.people.getViewer().execute(function(data) {
+            userId = data.id;
+            if (ownerId != null && userId != null) {
+                isOwner = (ownerId == userId);
             }
         });
     });
 }
 
-function renderEditPage() {
+function getState() {
     var state = wave.getState();
-    var timeline = state.get('timeline');
+    var timelineType = state.get('timeline_type');
+
+    if (timelineType == null || timelineType == '') {
+        timelineType = 'user_timeline';
+    }
+
+    return {
+        timeline: state.get('timeline'),
+        timelineType: timelineType
+    };
+}
+
+function adjustSize(size) {
+    if (size != null) {
+        gadgets.window.adjustHeight(size);
+    } else {
+        gadgets.window.adjustHeight();
+    }
+}
+
+function getTimelineName(timeline) {
+    if (timeline.substring(0,1) == '@') {
+        return timeline.substring(1);
+    } else return timeline;
+}
+
+function validateInput() {
+    var el = document.getElementsByClassName('twitter-input');
+    if (el == null && el.length < 1) return false;
+
+    var input = el[0];
+    var passed = false;
+    var msg = '';
+    if (input.value == '@') {
+        msg = 'The input is not existing timeline.';
+    } else if (input.id == 'timeline') {
+        var r = /^@[a-z0-9_]+$/i;
+        passed = r.test(input.value);
+        msg = 'Timeline should start with @ and contain only digits, letters, underscores.';
+    } else if (input.id == 'widget_id') {
+        var r = /^\d+$/;
+        passed = r.test(input.value);
+        msg = 'Only digits are allowed.';
+    }
+
+    handleUiErrors(msg, passed);
+    return passed;
+}
+
+function handleUiErrors(message, clean) {
+    if (clean == null) clean = true;
+
+    var input = document.getElementsByClassName('twitter-input')[0];
+    var span = document.getElementById('error_txt');
+
+    if (clean) {
+        input.style.borderStyle='';
+        input.style.borderColor = '';
+        span.textContent = '';
+    } else {
+        input.style.borderStyle='solid';
+        input.style.borderColor = 'red';
+        span.textContent = message;
+    }
+}
+
+function receiveTimeline(timelineType, timeline) {
+    var target = {};
+    if (timelineType == 'widget_timeline') {
+        target = {sourceType: 'widget', widgetId: timeline};
+    } else {
+        target = {sourceType: 'profile', screenName: getTimelineName(timeline)};
+    }
+    hidden_el = document.getElementById('hidden_div');
+    return twttr.widgets.createTimeline(target, hidden_el);
+}
+
+function renderEditButton() {
+    if (!isOwner || document.getElementById('editButtonIcon') != null) return;
+
+    var footer = document.getElementById('footer');
+    var button = document.createElement('div');
+    button.setAttribute('id', 'editButtonIcon');
+    button.setAttribute('onclick', 'renderEditPage()');
+    footer.appendChild(button);
+}
+
+function handleSaveButton(saving) {
+    if (saving == null) saving = true;
+
+    var btn = document.getElementById('saveButton');
+    if (btn == null) return;
+
+    if (saving) {
+        btn.textContent = 'Saving...'
+        btn.disabled = true;
+    } else {
+        btn.textContent = 'Save'
+        btn.disabled = false;
+    }
+}
+
+function cancelEdit() {
+    var state = getState();
+    if (state.timeline != null && state.timeline != "") insertTimeline();
+}
+
+function saveTimeline() {
+    if (!validateInput()) return;
+
+    handleSaveButton();
+
+    var timeline = '';
+    var timelineType = document.getElementById('timeline_type').value;
+    if (timelineType == 'widget_timeline') {
+        timeline = document.getElementById('widget_id').value;
+    } else {
+        timeline = document.getElementById('timeline').value;
+    }
+
+    receiveTimeline(timelineType, timeline).then(function(f) {
+        document.getElementById('hidden_div').innerHTML = '';
+        handleUiErrors('The input is not existing timeline.', f != null);
+
+        if (f == null) {
+            handleSaveButton(false);
+            return;
+        }
+
+        isOnSave = true;
+
+        var state = wave.getState();
+        state.submitDelta({
+            'timeline': timeline,
+            'timeline_type': timelineType
+        });
+    });
+}
+
+function renderTimelineInput(timelineType, timeline) {
+    var html = '';
+    var value = '';
+    if (timeline != null && timeline != '') value = "value='"+timeline+"'";
+
+    if (timelineType == 'widget_timeline') {
+        html += "<p class='label'>Enter widget ID:</p>";
+        html += "<input id='widget_id' class='twitter-input' type='text' "+value+" />";
+    } else {
+        html += "<p class='label'>Enter User Timeline:</p>";
+        html += "<input id='timeline' class='twitter-input' type='text' placeholder='e.g. @twitter' "+value+" />";
+    }
+    html += "<span id='error_txt' style='display: block;'></span>"
+
+    document.getElementById('timeline_input_container').innerHTML = html;
+}
+
+function isEditPageShown() {
+    return (document.getElementById('saveButton') != null);
+}
+
+function renderEditPage() {
+    if (isEditPageShown()) return;
+
+    var state = getState();
 
     var html = "";
     var htmlHeader = "";
     var htmlFooter = "";
 
-    html += "<p style='font-size: 14px;'>Choose Twitter timeline from list:</p>";
-    //if (timeline != null && timeline != "") {
-    //} else {
-        html += "<select id='timeline_select'>";
-        html += "<option value='saphybris'>@saphybris</option>";
-        html += "<option value='SAPPHIRENOW'>@SAPPHIRENOW</option>";
-        html += "<option value='SAPSocial'>@SAPSocial</option>";
-        html += "<option value='saphcp'>@saphcp</option>";
-        html += "<option value='BillRMcDermott'>@BillRMcDermott</option>";
-        html += "<option value='SAP'>@SAP</option>";
-        html += "<option value='SAPAriba'>@SAPAriba</option>";
-        html += "<option value='SuccessFactors'>@SuccessFactors</option>";
-        html += "<option value='SAPDigitalSvcs'>@SAPDigitalSvcs </option>";
-        html += "<option value='SAPPartnerEdge'>@SAPPartnerEdge</option>";
-        html += "<option value='SAPInMemory'>@SAPInMemory</option>";
-        html += "<option value='SAPAnalytics'>@SAPAnalytics</option>";
-        html += "<option value='SAPCommNet'>@SAPCommNet</option>";
-        html += "<option value='sapnews'>@sapnews</option>";
-        html += "<option value='SAPTechEd'>@SAPTechEd</option>";
-        html += "<option value='SAPMentors'>@SAPMentors</option>";
-        html += "<option value='SAPMillMining'>@SAPMillMining</option>";
-        html += "<option value='SAP_IoT'>@SAP_IoT</option>";
-        html += "<option value='SAPMENA'>@SAPMENA</option>";
-        html += "<option value='SAPforBanking'>@SAPforBanking</option>";
-        html += "<option value='SAP_Retail'>@SAP_Retail</option>";
-        html += "</select>";
-    //}
+    html += "<p class='label'>Select timeline type:</p>";
+    html += "<select id='timeline_type'>";
+    html += "<option value='user_timeline'>User Timeline</option>";
+    html += "<option value='widget_timeline' selected>Widget Timeline</option>";
+    html += "</select>"
 
+    html += "<div id='timeline_input_container'></div>"
     html += "</br>";
 
-    html += "<button id='saveButton' onclick='saveTimeline()''>Save</button>";
-    html += "<button id='cancelButton' onclick='renderTwitter()''>Cancel</button>";
+    html += "<button id='saveButton' onclick='saveTimeline()'>Save</button>";
+    html += "<button id='cancelButton' onclick='cancelEdit()'>Cancel</button>";
 
     html += "<p>";
     html += "Please report issues to IT direct component ";
     html += "<a target='_blank' href='https://itdirect.wdf.sap.corp/sap(bD1lbiZjPTAwMSZkPW1pbg==)/bc/bsp/sap/crm_ui_start/default.htm?saprole=ZITSERVREQU&crm-object-type=AIC_OB_INCIDENT&crm-object-action=D&PROCESS_TYPE=ZINE&CAT_ID=IMAS_JAM'>'IMAS_Jam'</a>";
-    html += ", feedback to ";
+    html += ", provide your feedback on ";
     html += "<a target='_blank' href='https://jam4.sapjam.com/groups/about_page/3B960zLBubCXJjPjDT59T5'>SAP Jam Support Center</a>";
     html += ".";
     html += "</p>";
+    html += "<div id='hidden_div' style='display: none;'></div>"
+
+    htmlHeader += "<h3>Settings:</h3>";
+    htmlHeader += "<div class='help'><a href='https://jam4.sapjam.com/wiki/show/2ZrYD1OhdVispcr5bSzf1T' target='_blank' title='Help'><div id='help_icon'></div></a></div>";
+
 
     document.getElementById('body').innerHTML = html;
     document.getElementById('footer').innerHTML = htmlFooter;
     document.getElementById('header').innerHTML = htmlHeader;
-}
 
-function saveTimeline() {
-    var state = wave.getState();
-    var timeline = document.getElementById('timeline_select').value;
+    document.getElementById('timeline_type').value = state.timelineType;
+    renderTimelineInput(state.timelineType, state.timeline);
 
-    state.submitDelta({'timeline' : timeline});
-
-    renderTwitter();
-}
-
-function insertTimeline(timeline) {
-    var saphybris = "<a class='twitter-timeline' href='https://twitter.com/saphybris'>Tweets by @saphybris</a>";
-    var SAPPHIRENOW = "<a class='twitter-timeline' href='https://twitter.com/SAPPHIRENOW'>Tweets by @SAPPHIRENOW</a>";
-    var SAPSocial = "<a class='twitter-timeline' href='https://twitter.com/SAPSocial'>Tweets by @SAPSocial</a>";
-    var saphcp = "<a class='twitter-timeline' href='https://twitter.com/saphcp'>Tweets by @saphcp</a>";
-    var BillRMcDermott = "<a class='twitter-timeline' href='https://twitter.com/BillRMcDermott'>Tweets by @BillRMcDermott</a>";
-    var SAP = "<a class='twitter-timeline' href='https://twitter.com/SAP'>Tweets by @SAP</a>";
-    var SAPAriba = "<a class='twitter-timeline' href='https://twitter.com/SAPAriba'>Tweets by @SAPAriba</a>";
-    var SuccessFactors = "<a class='twitter-timeline' href='https://twitter.com/SuccessFactors'>Tweets by @SuccessFactors</a>";
-    var SAPDigitalSvcs = "<a class='twitter-timeline' href='https://twitter.com/SAPDigitalSvcs'>Tweets by @SAPDigitalSvcs</a>";
-    var SAPPartnerEdge = "<a class='twitter-timeline' href='https://twitter.com/SAPPartnerEdge'>Tweets by @SAPPartnerEdge</a>";
-    var SAPInMemory = "<a class='twitter-timeline' href='https://twitter.com/SAPInMemory'>Tweets by @SAPInMemory</a>";
-    var SAPAnalytics = "<a class='twitter-timeline' href='https://twitter.com/SAPAnalytics'>Tweets by @SAPAnalytics</a>";
-    var SAPCommNet = "<a class='twitter-timeline' href='https://twitter.com/SAPCommNet'>Tweets by @SAPCommNet</a>";
-    var sapnews = "<a class='twitter-timeline' href='https://twitter.com/sapnews'>Tweets by @sapnews</a>";
-    var SAPTechEd = "<a class='twitter-timeline' href='https://twitter.com/SAPTechEd'>Tweets by @SAPTechEd</a>";
-    var SAPMentors = "<a class='twitter-timeline' href='https://twitter.com/SAPMentors'>Tweets by @SAPMentors</a>";
-    var SAPMillMining = "<a class='twitter-timeline' href='https://twitter.com/SAPMillMining'>Tweets by @SAPMillMining</a>";
-    var SAP_IoT = "<a class='twitter-timeline' href='https://twitter.com/SAP_IoT'>Tweets by @SAP_IoT</a>";
-    var SAPMENA = "<a class='twitter-timeline' href='https://twitter.com/SAPMENA'>Tweets by @SAPMENA</a>";
-    var SAPforBanking = "<a class='twitter-timeline' href='https://twitter.com/SAPforBanking'>Tweets by @SAPforBanking</a>";
-    var SAP_Retail = "<a class='twitter-timeline' href='https://twitter.com/SAP_Retail'>Tweets by @SAP_Retail</a>";
-
-    var state = wave.getState();
-    var timeline = state.get('timeline');
-
-    var html = "";
-    var htmlFooter = "";
-
-    if (timeline == "saphybris") {
-        html += saphybris;
-    } else if (timeline == "SAPPHIRENOW") {
-        html += SAPPHIRENOW;
-    } else if (timeline == "SAPSocial") {
-        html += SAPSocial;
-    } else if (timeline == "saphcp") {
-        html += saphcp;
-    } else if (timeline == "BillRMcDermott") {
-        html += BillRMcDermott;
-    } else if (timeline == "SAP") {
-        html += SAP;
-    } else if (timeline == "SAPAriba") {
-        html += SAPAriba;
-    } else if (timeline == "SuccessFactors") {
-        html += SuccessFactors;
-    } else if (timeline == "SAPDigitalSvcs") {
-        html += SAPDigitalSvcs;
-    } else if (timeline == "SAPPartnerEdge") {
-        html += SAPPartnerEdge;
-    } else if (timeline == "SAPInMemory") {
-        html += SAPInMemory;
-    } else if (timeline == "SAPAnalytics") {
-        html += SAPAnalytics;
-    } else if (timeline == "SAPCommNet") {
-        html += SAPCommNet;
-    } else if (timeline == "sapnews") {
-        html += sapnews;
-    } else if (timeline == "SAPTechEd") {
-        html += SAPTechEd;
-    } else if (timeline == "SAPMentors") {
-        html += SAPMentors;
-    } else if (timeline == "SAPMillMining") {
-        html += SAPMillMining;
-    } else if (timeline == "SAP_IoT") {
-        html += SAP_IoT;
-    } else if (timeline == "SAPMENA") {
-        html += SAPMENA;
-    } else if (timeline == "SAPforBanking") {
-        html += SAPforBanking;
-    } else if (timeline == "SAP_Retail") {
-        html += SAP_Retail;
-    }
-
-    if (isOwner) {
-        //htmlFooter += "<button id='editButton' onclick='renderEditPage()''>Edit</button>";
-        htmlFooter += "<div id='editButtonIcon' onclick='renderEditPage()''></div>";
-    }
-
-    document.getElementById('body').innerHTML = html;
-    document.getElementById('footer').innerHTML = htmlFooter;
-
-    twttr.widgets.load(
-        document.getElementById('body')
-    );
-
-    if (linkCheck == null) {
-        linkCheck = setInterval(function() {
-            fixTwitterLinks();
-        }, 2000);
-    }
-}
-
-function fixTwitterLinks() {
-    var footers = document.getElementsByClassName('timeline-Footer');
-    for (i = 0; i < footers.length; i++) {
-        var links = footers[i].getElementsByTagName('a');
-        for (j = 0; j < links.length; j++) {
-            links[j].target = "_blank";
+    document.getElementById('timeline_type').onchange = function() {
+        if (this.value == state.timelineType) {
+            renderTimelineInput(this.value, state.timeline);
+        } else {
+            renderTimelineInput(this.value);
         }
     }
+}
+
+function isTimelineShown() {
+    var frames = document.getElementsByTagName('iframe');
+    for (var i = 0; i < frames.length; i++) {
+        if (frames[i].id != null && frames[i].id.indexOf('twitter-widget') > -1) return true;
+    }
+    return false;
+}
+
+function insertTimeline() {
+    if (isTimelineShown()) {
+        renderEditButton();
+        return;
+    }
+
+    var body = document.getElementById('body');
+    var footer = document.getElementById('footer');
+    var header = document.getElementById('header');
+
+    body.innerHTML = '';
+    footer.innerHTML = '';
+    header.innerHTML = '';
+
+    var target = {};
+    var options = {};
+    var state = getState();
+    if (state.timelineType == 'widget_timeline') {
+        target = {sourceType: 'widget', widgetId: state.timeline};
+        options = {width: '100%'};
+    } else {
+        target = {sourceType: 'profile', screenName: getTimelineName(state.timeline)};
+    }
+
+    twttr.widgets.createTimeline(target, body, options).then(function(f) {
+        twttr.ready(function (twttr) {
+            if (state.timelineType == 'widget_timeline') {
+                adjustSize();
+            } else {
+                adjustSize(500);
+            }
+            renderEditButton();
+        });
+    });
 }
 
 function renderTwitter() {
-    if (!wave.getState()) {
-        return;
-    }
-    var state = wave.getState();
-    var timeline = state.get('timeline');
-
+    if (!wave.getState()) return;
     checkIfOwner();
+    if (!isOnSave && isEditPageShown()) return;
 
-    if (timeline != null && timeline != "") {
-        insertTimeline(timeline);
+    isOnSave = false;
+
+    var state = getState();
+    if (state.timeline != null && state.timeline != "") {
+        insertTimeline();
     } else {
-        if (isOwner) {
-           renderEditPage();
-        } else {
-            setTimeout(function(){
-                if (isOwner) {
-                   renderEditPage();
-                }
-            }, 2000);
-        }
+        if (isOwner) renderEditPage();
     }
-
-    var twitterWidgetHeight = 0;
-    var frames = document.getElementsByTagName("iframe");
-    for (var i = frames.length; i;) {
-        var frame = frames[--i];
-        if (frame.id.indexOf("twitter-widget") > -1) {
-            twitterWidgetHeight = frame.offsetHeight + 20;
-        }
-    }
-
-    var iframeHeight = 0;
-    if (twitterWidgetHeight == 0) {
-        iframeHeight = 520;
-    } else {
-        iframeHeight = twitterWidgetHeight;
-    }
-
-    /*gadgets.window.adjustHeight(iframeHeight);
-    setTimeout(function(){
-        gadgets.window.adjustHeight();
-    }, 1500);*/
 }
 
 function init() {
     if (wave && wave.isInWaveContainer()) {
         wave.setStateCallback(renderTwitter);
-
-        // wave.setParticipantCallback(renderTwitter);
     }
 }
 

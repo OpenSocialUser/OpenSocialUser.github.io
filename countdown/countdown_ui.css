@@ -11,17 +11,22 @@ html {
 
 #countdown_gadget {
 	width: 95%;
-	/*min-height: 150px;*/
 	position: relative;
 }
 
 #body {
-	/*height: 230px;*/
-	margin-top: 20px;
+
 }
 
-#header {
+#header h3 {
+  display: inline-block;
+  vertical-align: middle;
+}
 
+#header .help {
+  display: inline-block;
+  vertical-align: middle;
+  padding-left: 5px;
 }
 
 #footer {
@@ -59,9 +64,21 @@ html {
 }
 
 #editButtonIcon {
-	margin-top: 10px;
+	margin-top: 20px;
 	margin-left: 10px;
 	width: 22px;
 	height: 22px;
 	background-image: url('http://opensocialuser.github.io/settings_icon.png');
+}
+
+.label {
+	font-size: 14px;
+	margin-bottom: 6px;
+}
+
+#help_icon {
+	width: 16px;
+	height: 16px;
+	background-image: url('http://opensocialuser.github.io/jam_help_icon.png');
+	background-size: contain;
 }

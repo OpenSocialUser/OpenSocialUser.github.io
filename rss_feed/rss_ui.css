@@ -5,13 +5,27 @@
 }
 
 #body {
-	margin-top: 20px;
 	margin-bottom: 20px;
 	display: inline-block;
 	width: 100%;
 }
 
 #header {
+
+}
+
+#header h3 {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+#header .help {
+  display: inline-block;
+  vertical-align: middle;
+  padding-left: 5px;
+}
+
+.rss-header {
 	height: 30px;
 	display: inline-block;
 	width: 100%;
@@ -97,4 +111,21 @@
 	width: 22px;
 	height: 22px;
 	background-image: url('http://opensocialuser.github.io/settings_icon.png');
+}
+
+#error_txt {
+	color: #ff0000;
+	font-size: 13px;
+}
+
+.label {
+	font-size: 14px;
+	margin-bottom: 6px;
+}
+
+#help_icon {
+	width: 16px;
+	height: 16px;
+	background-image: url('http://opensocialuser.github.io/jam_help_icon.png');
+	background-size: contain;
 }

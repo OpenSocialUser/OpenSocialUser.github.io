@@ -16,8 +16,9 @@ var jscolor={dir:"",bindClass:"color",binding:!0,preloading:!0,install:function(
 
 
 // countdown_logic.js
-var isOwner = false;
+var isOwner = null;
 var selectedDate = "";
+var isOnSave = false;
 
 function toJSON(obj) {
 	return gadgets.json.stringify(obj);
@@ -27,314 +28,342 @@ function toObject(str) {
     return gadgets.json.parse(str);
 }
 
-function updateCountdown() {
-	var state = wave.getState();
-
-    var digits = "";
-    var targetTime = "";
-    var displayCircles = true;
-
-    var readMoreLink = $("#read_more_field").val();
-
-    var digitsRadio = $("input[type='radio'][name='digits']:checked");
-    if (digitsRadio.length > 0) {
-        digits = digitsRadio.val();
-    } else {
-        digits = "all";
-    }
-
-    targetTime = selectedDate;
-
-    var circlesCheckbox = $("input[type='checkbox'][name='circles']:checked");
-    if (circlesCheckbox.length > 0) {
-        displayCircles = true;
-    } else {
-        displayCircles = false;
-    }
-
-    circlesColor = $("#picker").val();
-    if (circlesColor == null || circlesColor == undefined || circlesColor == "") {
-        circlesColor == "40484F";
-    }
-
-    if (targetTime != null && targetTime != "") {
-        state.submitDelta({'digits' : digits});
-        state.submitDelta({'target_time' : targetTime});
-        state.submitDelta({'display_circles' : displayCircles});
-        state.submitDelta({'circles_color' : circlesColor});
-        state.submitDelta({'read_more_link' : readMoreLink});
-
-        drawCountdown(digits, targetTime, displayCircles, circlesColor, readMoreLink);
-    } else {
-        renderEditPage();
-    }
+function currentDate() {
+  var d = new Date;
+  return formatDate(d.getFullYear(),d.getMonth()+1,d.getDate(),d.getHours()+1);
 }
 
-function drawCountdown(digits, targetTime, displayCircles, circlesColor, readMoreLink) {
-    var html = "";
-    var htmlHeader = "";
-    var htmlFooter = "";
+function formatDate(y, m, d, h) {
+  return y+'/'+m+'/'+d+' '+h+':00'
+}
 
-    var showAllDigits = true;
-
-    if (digits != null && digits == "days") {
-        showAllDigits = false;
-    } else {
-        showAllDigits = true;
-    }
-
-    if (showAllDigits) {
-        html += "<div id='countdown' style='width: 90%;'></div>";
-    } else {
-        var gadgetWidth = $("#countdown_gadget").width()
-        if (gadgetWidth < 300) {
-            html += "<div id='countdown' style='width: 90%;'></div>";
-        } else if (gadgetWidth < 350) {
-            html += "<div id='countdown' style='width: 70%;'></div>";
-        } else if (gadgetWidth < 410) {
-            html += "<div id='countdown' style='width: 58%;'></div>";
-        } else if (gadgetWidth < 500) {
-            html += "<div id='countdown' style='width: 49%;'></div>";
-        } else if (gadgetWidth < 600) {
-            html += "<div id='countdown' style='width: 43%;'></div>";
-        } else {
-            html += "<div id='countdown' style='width: 28%;'></div>";
-        }
-    }
-
-
-    if (readMoreLink != null && readMoreLink != "") {
-        if (showAllDigits) {
-            html += "<div id='read_more'>";
-        } else {
-            html += "<div id='read_more' style='position: relative; bottom: 20px;'>";
-        }
-        html += "<a id='read_more_link' target='_blank' href='" + readMoreLink + "'>Read More</a>"
-        html += "</div>";
-    }
-
-    if (isOwner) {
-        //htmlFooter += "<button id='editButton' onclick='renderEditPage()''>Edit</button>";
-        htmlFooter += "<div id='editButtonIcon' onclick='renderEditPage()''></div>";
-    }
-
-    document.getElementById('body').innerHTML = html;
-    document.getElementById('footer').innerHTML = htmlFooter;
-    document.getElementById('header').innerHTML = htmlHeader;
-
-    $("#countdown").data("date", targetTime);
-
-    $("#countdown").TimeCircles({
-        "count_past_zero": false,
-        "animation": "smooth",
-        "bg_width": 0.2,
-        "fg_width": 0.03,
-        "circle_bg_color": "#90989F",
-        "time": {
-            "Days": {
-                "text": "Days",
-                "color": "#" + circlesColor,
-                "show": true
-            },
-            "Hours": {
-                "text": "Hours",
-                "color": "#" + circlesColor,
-                "show": showAllDigits
-            },
-            "Minutes": {
-                "text": "Minutes",
-                "color": "#" + circlesColor,
-                "show": showAllDigits
-            },
-            "Seconds": {
-                "text": "Seconds",
-                "color": "#" + circlesColor,
-                "show": showAllDigits
-            }
-        }
-
-    });
-
-    if (displayCircles != null && !displayCircles) {
-        var canvas = $("#circlesCanvas");
-        canvas.hide();
-
-        var timeCirclesDiv = $(".time_circles").first();
-
-        timeCirclesDiv.css("height", canvas[0].height + "px");
-    }
+function updateDateTimeToSelected(ct, input) {
+  selectedDate = formatDate(ct.getFullYear(),ct.getMonth()+1,ct.getDate(),ct.getHours());
+  input.val(selectedDate);
 }
 
 function checkIfOwner() {
-    var userId = null;
-    var ownerId = null;
+  if (isOwner != null) return;
 
+  var userId = null;
+  var ownerId = null;
+  osapi.people.getOwner().execute(function(data) {
+    ownerId = data.id;
     osapi.people.getViewer().execute(function(data) {
-        userId = data.id;
-        osapi.people.getOwner().execute(function(data) {
-            ownerId = data.id;
-            if (ownerId != null && userId != null && ownerId == userId) {
-                isOwner = true;
-            } else {
-                isOwner = false;
-            }
-        });
+      userId = data.id;
+      if (ownerId != null && userId != null) {
+        isOwner = (ownerId == userId);
+      }
     });
+  });
+}
+
+function getState() {
+  var state = wave.getState();
+
+  return {
+    targetTime: state.get('target_time'),
+    digits: state.get('digits'),
+    displayCircles: state.get('display_circles'),
+    circlesColor: state.get('circles_color'),
+    readMoreLink: state.get('read_more_link')
+  };
+}
+
+function renderEditButton() {
+  if (!isOwner || document.getElementById('editButtonIcon') != null) return;
+
+  var footer = document.getElementById('footer');
+  var button = document.createElement('div');
+  button.setAttribute('id', 'editButtonIcon');
+  button.setAttribute('onclick', 'renderEditPage()');
+  footer.appendChild(button);
+}
+
+function handleSaveButton(saving) {
+  if (saving == null) saving = true;
+
+  var btn = document.getElementById('saveButton');
+  if (btn == null) return;
+
+  if (saving) {
+    btn.textContent = 'Saving...'
+    btn.disabled = true;
+  } else {
+    btn.textContent = 'Save'
+    btn.disabled = false;
+  }
+}
+
+function cancelEdit() {
+  var state = getState();
+  if (state.targetTime != null && state.digits != "") insertCountdown();
+}
+
+function saveCountdown() {
+  var state = getState();
+
+  var digits = "";
+  var targetTime = "";
+  var displayCircles = true;
+
+  var readMoreLink = $("#read_more_field").val();
+
+  var digitsRadio = $("input[type='radio'][name='digits']:checked");
+  if (digitsRadio.length > 0) {
+    digits = digitsRadio.val();
+  } else {
+    digits = "all";
+  }
+
+  targetTime = selectedDate;
+
+  var circlesCheckbox = $("input[type='checkbox'][name='circles']:checked");
+  if (circlesCheckbox.length > 0) {
+    displayCircles = true;
+  } else {
+    displayCircles = false;
+  }
+
+  circlesColor = $("#picker").val();
+  if (circlesColor == null || circlesColor == undefined || circlesColor == "") {
+    circlesColor == "40484F";
+  }
+
+  if (targetTime != null && targetTime != "") {
+    isOnSave = true;
+    handleSaveButton();
+
+    var stateToSubmit = wave.getState();
+    stateToSubmit.submitDelta({
+      'digits': digits,
+      'target_time': targetTime,
+      'display_circles': displayCircles,
+      'circles_color': circlesColor,
+      'read_more_link': readMoreLink
+    });
+  } else {
+    renderEditPage();
+  }
+}
+
+function isCountdownShown() {
+  return $('#countdown').length > 0;
+}
+
+function insertCountdown() {
+  if (isCountdownShown()) {
+      renderEditButton();
+      return;
+  }
+
+  var state = getState();
+
+  var html = "";
+  var htmlHeader = "";
+  var htmlFooter = "";
+
+  var showAllDigits = true;
+  if (state.digits != null && state.digits == "days") showAllDigits = false;
+
+  if (showAllDigits) {
+    html += "<div id='countdown' style='width: 90%;'></div>";
+  } else {
+    var gadgetWidth = $("#countdown_gadget").width()
+    if (gadgetWidth < 300) {
+      html += "<div id='countdown' style='width: 90%;'></div>";
+    } else if (gadgetWidth < 350) {
+      html += "<div id='countdown' style='width: 70%;'></div>";
+    } else if (gadgetWidth < 410) {
+      html += "<div id='countdown' style='width: 58%;'></div>";
+    } else if (gadgetWidth < 500) {
+      html += "<div id='countdown' style='width: 49%;'></div>";
+    } else if (gadgetWidth < 600) {
+      html += "<div id='countdown' style='width: 43%;'></div>";
+    } else {
+      html += "<div id='countdown' style='width: 28%;'></div>";
+    }
+  }
+
+  if (state.readMoreLink != null && state.readMoreLink != "") {
+    if (showAllDigits) {
+      html += "<div id='read_more'>";
+    } else {
+      html += "<div id='read_more' style='position: relative; bottom: 20px;'>";
+    }
+    html += "<a id='read_more_link' target='_blank' href='" + state.readMoreLink + "'>Read More</a>"
+    html += "</div>";
+  }
+
+  htmlHeader += "<div style='height: 20px'></div>"
+
+  document.getElementById('body').innerHTML = html;
+  document.getElementById('footer').innerHTML = htmlFooter;
+  document.getElementById('header').innerHTML = htmlHeader;
+
+  $("#countdown").data("date", state.targetTime);
+
+  $("#countdown").TimeCircles({
+    "count_past_zero": false,
+    "animation": "smooth",
+    "bg_width": 0.2,
+    "fg_width": 0.03,
+    "circle_bg_color": "#90989F",
+    "time": {
+      "Days": {
+        "text": "Days",
+        "color": "#" + state.circlesColor,
+        "show": true
+      },
+      "Hours": {
+        "text": "Hours",
+        "color": "#" + state.circlesColor,
+        "show": showAllDigits
+      },
+      "Minutes": {
+        "text": "Minutes",
+        "color": "#" + state.circlesColor,
+        "show": showAllDigits
+      },
+      "Seconds": {
+        "text": "Seconds",
+        "color": "#" + state.circlesColor,
+        "show": showAllDigits
+      }
+    }
+  });
+
+  if (state.displayCircles != null && !state.displayCircles) {
+    var canvas = $("#circlesCanvas");
+    canvas.hide();
+    var timeCirclesDiv = $(".time_circles").first();
+    timeCirclesDiv.css("height", canvas[0].height + "px");
+  }
+
+  renderEditButton();
+  window.onload = gadgets.window.adjustHeight();
+}
+
+function isEditPageShown() {
+  return (document.getElementById('saveButton') != null);
 }
 
 function renderEditPage() {
-	var state = wave.getState();
+  if (isEditPageShown()) return;
 
-  var targetTime = state.get('target_time');
-  var digits = state.get('digits');
-  var displayCircles = state.get('display_circles');
-  var circlesColor = state.get('circles_color');
-  var readMoreLink = state.get('read_more_link');
+  var state = getState();
 
-	var html = "";
-	var htmlHeader = "";
-	var htmlFooter = "";
+  var html = "";
+  var htmlHeader = "";
+  var htmlFooter = "";
 
-    html += "<p style='font-size: 14px;'>Choose digits to display:</p>";
+  html += "<p class='label'>Choose digits to display:</p>";
 
-    if (digits != null && digits == "days") {
-        html += "<input type='radio' name='digits' value='all'>Days with hour/min/sec</input>";
-        html += "</br>";
-        html += "<input type='radio' name='digits' value='days' checked='true'>Days only</input>";
-    } else {
-        html += "<input type='radio' name='digits' value='all' checked='true'>Days with hour/min/sec</input>";
-        html += "</br>";
-        html += "<input type='radio' name='digits' value='days'>Days only</input>";
-    }
-
+  if (state.digits != null && state.digits == "days") {
+    html += "<input type='radio' name='digits' value='all'>Days with hour/min/sec</input>";
     html += "</br>";
-
-    html += "<p style='font-size: 14px;'>Countdown style:</p>";
-
-    if (displayCircles != null && displayCircles == false) {
-        html += "<input type='checkbox' name='circles' value='true'>Display circles</input>";
-    } else {
-        html += "<input type='checkbox' name='circles' value='true' checked='true'>Display circles</input>";
-    }
-
+    html += "<input type='radio' name='digits' value='days' checked='true'>Days only</input>";
+  } else {
+    html += "<input type='radio' name='digits' value='all' checked='true'>Days with hour/min/sec</input>";
     html += "</br>";
+    html += "<input type='radio' name='digits' value='days'>Days only</input>";
+  }
 
-    html += "<p style='font-size: 14px;'>Pick circle color:</p>";
+  html += "</br>";
+  html += "<p class='label'>Countdown style:</p>";
 
-    if (circlesColor != null && circlesColor != "") {
-        html += "<input id='picker' class='color' value='" + circlesColor + "'/>";
-    } else {
-        html += "<input id='picker' class='color' value='40484F'/>";
-    }
+  if (state.displayCircles != null && state.displayCircles == false) {
+    html += "<input type='checkbox' name='circles' value='true'>Display circles</input>";
+  } else {
+    html += "<input type='checkbox' name='circles' value='true' checked='true'>Display circles</input>";
+  }
 
-    html += "</br>";
+  html += "</br>";
+  html += "<p class='label'>Pick circle color:</p>";
 
-    html += "<p style='font-size: 14px;'>Enter date for the Final Countdown:</p>";
+  if (state.circlesColor != null && state.circlesColor != "") {
+    html += "<input id='picker' class='color' value='" + state.circlesColor + "'/>";
+  } else {
+    html += "<input id='picker' class='color' value='40484F'/>";
+  }
 
-    if (targetTime != null && targetTime != "") {
-        html += "<input id='target_date_picker' type='text' value='" + targetTime + "'/>";
-        selectedDate = targetTime;
-    } else {
-        selectedDate = currentDate();
-        html += "<input id='target_date_picker' type='text' value='" + selectedDate + "'/>";
-    }
+  html += "</br>";
+  html += "<p class='label'>Enter date for the Final Countdown:</p>";
 
-    html += "</br>";
+  if (state.targetTime != null && state.targetTime != "") {
+    selectedDate = state.targetTime;
+  } else {
+    selectedDate = currentDate();
+  }
+  html += "<input id='target_date_picker' type='text' value='" + selectedDate + "'/>";
 
-    html += "<p style='font-size: 14px;'>Enter URL for 'Read More' link (if left empty the link won't be shown):</p>";
+  html += "</br>";
+  html += "<p class='label'>Enter URL for 'Read More' link (if left empty the link won't be shown):</p>";
 
-    if (readMoreLink != null && readMoreLink != "") {
-        html += "<input id='read_more_field' type='text' value='" + readMoreLink + "'/>";
-        selectedDate = targetTime;
-    } else {
-        html += "<input id='read_more_field' type='text'/>";
-    }
+  if (state.readMoreLink != null && state.readMoreLink != "") {
+    html += "<input id='read_more_field' type='text' value='" + state.readMoreLink + "'/>";
+  } else {
+    html += "<input id='read_more_field' type='text'/>";
+  }
 
-    html += "</br>";
-    html += "</br>";
+  html += "</br>";
+  html += "</br>";
 
-    html += "<button id='saveButton' onclick='updateCountdown()''>Save</button>";
-    html += "<button id='cancelButton' onclick='renderCountdown()''>Cancel</button>";
+  html += "<button id='saveButton' onclick='saveCountdown()'>Save</button>";
+  html += "<button id='cancelButton' onclick='cancelEdit()'>Cancel</button>";
 
-    html += "<p>";
-    html += "Please report issues to IT direct component ";
-    html += "<a target='_blank' href='https://itdirect.wdf.sap.corp/sap(bD1lbiZjPTAwMSZkPW1pbg==)/bc/bsp/sap/crm_ui_start/default.htm?saprole=ZITSERVREQU&crm-object-type=AIC_OB_INCIDENT&crm-object-action=D&PROCESS_TYPE=ZINE&CAT_ID=IMAS_JAM'>'IMAS_Jam'</a>";
-    html += ", feedback to ";
-    html += "<a target='_blank' href='https://jam4.sapjam.com/groups/about_page/3B960zLBubCXJjPjDT59T5'>SAP Jam Support Center</a>";
-    html += ".";
-    html += "</p>";
+  html += "<p>";
+  html += "Please report issues to IT direct component ";
+  html += "<a target='_blank' href='https://itdirect.wdf.sap.corp/sap(bD1lbiZjPTAwMSZkPW1pbg==)/bc/bsp/sap/crm_ui_start/default.htm?saprole=ZITSERVREQU&crm-object-type=AIC_OB_INCIDENT&crm-object-action=D&PROCESS_TYPE=ZINE&CAT_ID=IMAS_JAM'>'IMAS_Jam'</a>";
+  html += ", provide your feedback on ";
+  html += "<a target='_blank' href='https://jam4.sapjam.com/groups/about_page/3B960zLBubCXJjPjDT59T5'>SAP Jam Support Center</a>";
+  html += ".";
+  html += "</p>";
 
-    htmlHeader += "<h3>Settings:</h3>";
+  htmlHeader += "<h3>Settings:</h3>";
+  htmlHeader += "<div class='help'><a href='https://jam4.sapjam.com/wiki/show/2ZrYD1OhdVispcr5bSzf1T' target='_blank' title='Help'><div id='help_icon'></div></a></div>";
 
-    document.getElementById('body').innerHTML = html;
-    document.getElementById('footer').innerHTML = htmlFooter;
-    document.getElementById('header').innerHTML = htmlHeader;
+  document.getElementById('body').innerHTML = html;
+  document.getElementById('footer').innerHTML = htmlFooter;
+  document.getElementById('header').innerHTML = htmlHeader;
 
-    $("#target_date_picker").datetimepicker({
-        inline:true,
-        minDate: '-1970/01/01',
-        onChangeDateTime:function(dp, $input){
-            selectedDate = $input.val();
-        }
-    });
+  $("#target_date_picker").datetimepicker({
+    inline:true,
+    minDate: '-1970/01/01',
+    onChangeDateTime:function(dp, $input){ selectedDate = $input.val(); },
+    onChangeMonth:function(ct, $input){ updateDateTimeToSelected(ct,$input); },
+    onChangeYear:function(ct, $input){ updateDateTimeToSelected(ct,$input); }
+  });
 
-    var colorPicker = new jscolor.color(document.getElementById('picker'), {});
-    colorPicker.fromString($("#picker").val());
+  var colorPicker = new jscolor.color(document.getElementById('picker'), {});
+  colorPicker.fromString($("#picker").val());
 
-    window.onload = gadgets.window.adjustHeight(300);
+  $('.xdsoft_today_button').click(function() {
+    selectedDate = currentDate();
+  });
+
+  window.onload = gadgets.window.adjustHeight(300);
 }
 
 function renderCountdown() {
-    if (!wave.getState()) {
-        return;
-    }
-    var state = wave.getState();
+  if (!wave.getState()) return;
+  checkIfOwner();
+  if (!isOnSave && isEditPageShown()) return;
 
-    var targetTime = state.get('target_time');
-    var digits = state.get('digits');
-    var circlesColor = state.get('circles_color');
-    var displayCircles = state.get('display_circles');
-    var readMoreLink = state.get('read_more_link');
+  isOnSave = false;
 
-    checkIfOwner();
-
-    if (targetTime != null && digits != null) {
-    	drawCountdown(digits, targetTime, displayCircles, circlesColor, readMoreLink);
-    } else {
-        if (isOwner) {
-    	   renderEditPage();
-        } else {
-            setTimeout(function(){
-                if (isOwner) {
-                   renderEditPage();
-                }
-            }, 2000);
-        }
-    }
-
-    window.onload = gadgets.window.adjustHeight();
-
-    /*gadgets.window.adjustHeight();
-    setTimeout(function(){
-        gadgets.window.adjustHeight();
-    }, 1500);*/
-}
-
-function currentDate() {
-  var date = new Date;
-  var hour = date.getHours() + 1;
-  var day = date.getDate();
-  var month = date.getMonth() + 1;
-  var year = date.getFullYear()
-  return year+'/'+month+'/'+day+' '+hour+':00'
+  var state = getState();
+  if (state.targetTime != null && state.digits != "") {
+    insertCountdown();
+  } else {
+    if (isOwner) renderEditPage();
+  }
 }
 
 function init() {
-    if (wave && wave.isInWaveContainer()) {
-        wave.setStateCallback(renderCountdown);
-
-        // wave.setParticipantCallback(renderCountdown);
-    }
+  if (wave && wave.isInWaveContainer()) {
+    wave.setStateCallback(renderCountdown);
+  }
 }
 
 gadgets.util.registerOnLoadHandler(init);
