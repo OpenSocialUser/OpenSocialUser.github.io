@@ -26,12 +26,32 @@ function checkIfOwner() {
     });
 }
 
+var timeline_types = {
+    user:   'user_timeline',
+    widget: 'widget_timeline'
+}
+
+var error_types = {
+    input:   'timeline',
+    general: 'general'
+}
+
+var error_messages = {
+    empty_user:     'Please provide User Timeline.',
+    empty_widget:   'Please provide Widget ID.',
+    invalid_user:   'Timeline should start with @ and contain only digits, letters, underscores.',
+    invalid_widget: 'Only digits are allowed.',
+    not_exist:      'The input is not existing timeline.',
+    inaccessible:   'The input is not existing timeline or the author has protected their tweets.',
+    general:        'Changes cannot be saved.\nPlease reload the page and try again.'
+}
+
 function getState() {
     var state = wave.getState();
     var timelineType = state.get('timeline_type');
 
     if (timelineType == null || timelineType == '') {
-        timelineType = 'user_timeline';
+        timelineType = timeline_types.user;
     }
 
     return {
@@ -55,48 +75,57 @@ function getTimelineName(timeline) {
 }
 
 function validateInput() {
+    var timelineType = document.getElementById('timeline_type').value;
     var el = document.getElementsByClassName('twitter-input');
     if (el == null && el.length < 1) return false;
 
     var input = el[0];
     var passed = false;
     var msg = '';
-    if (input.value == '@') {
-        msg = 'The input is not existing timeline.';
+    if (input.value == '' || input.value == null) {
+        msg = error_messages.empty_user;
+        if (timelineType == timeline_types.widget) msg = error_messages.empty_widget;
+    } else if (input.value == '@') {
+        msg = error_messages.not_exist;
     } else if (input.id == 'timeline') {
         var r = /^@[a-z0-9_]+$/i;
         passed = r.test(input.value);
-        msg = 'Timeline should start with @ and contain only digits, letters, underscores.';
+        msg = error_messages.invalid_user;
     } else if (input.id == 'widget_id') {
         var r = /^\d+$/;
         passed = r.test(input.value);
-        msg = 'Only digits are allowed.';
+        msg = error_messages.invalid_widget;
     }
 
-    handleUiErrors(msg, passed);
+    handleUiErrors(error_types.input, msg, passed);
     return passed;
 }
 
-function handleUiErrors(message, clean) {
+function handleUiErrors(type, message, clean) {
+    if (type == null) type = error_types.general;
     if (clean == null) clean = true;
 
     var input = document.getElementsByClassName('twitter-input')[0];
-    var span = document.getElementById('error_txt');
+    var timelineSpan = document.getElementById('timeline_error');
+    var generalSpan = document.getElementById('general_error');
 
     if (clean) {
         input.style.borderStyle='';
         input.style.borderColor = '';
-        span.textContent = '';
+        timelineSpan.innerText = '';
+        generalSpan.innerText = '';
+    } else if (type == error_types.general) {
+        generalSpan.innerText = message;
     } else {
         input.style.borderStyle='solid';
         input.style.borderColor = 'red';
-        span.textContent = message;
+        timelineSpan.innerText = message;
     }
 }
 
 function receiveTimeline(timelineType, timeline) {
     var target = {};
-    if (timelineType == 'widget_timeline') {
+    if (timelineType == timeline_types.widget) {
         target = {sourceType: 'widget', widgetId: timeline};
     } else {
         target = {sourceType: 'profile', screenName: getTimelineName(timeline)};
@@ -142,28 +171,38 @@ function saveTimeline() {
 
     var timeline = '';
     var timelineType = document.getElementById('timeline_type').value;
-    if (timelineType == 'widget_timeline') {
+    if (timelineType == timeline_types.widget) {
         timeline = document.getElementById('widget_id').value;
     } else {
         timeline = document.getElementById('timeline').value;
     }
 
-    receiveTimeline(timelineType, timeline).then(function(f) {
-        document.getElementById('hidden_div').innerHTML = '';
-        handleUiErrors('The input is not existing timeline.', f != null);
-
-        if (f == null) {
+    osapi.people.getOwner().execute(function(data) {
+        if (data.id == null) {
             handleSaveButton(false);
-            return;
+            handleUiErrors(error_types.general, error_messages.general, false);
+        } else {
+            receiveTimeline(timelineType, timeline).then(function(f) {
+                document.getElementById('hidden_div').innerHTML = '';
+
+                var message = error_messages.not_exist;
+                if (timelineType == timeline_types.user) message = error_messages.inaccessible;
+                handleUiErrors(error_types.input, message, f != null);
+
+                if (f == null) {
+                    handleSaveButton(false);
+                    return;
+                }
+
+                isOnSave = true;
+
+                var state = wave.getState();
+                state.submitDelta({
+                    'timeline': timeline,
+                    'timeline_type': timelineType
+                });
+            });
         }
-
-        isOnSave = true;
-
-        var state = wave.getState();
-        state.submitDelta({
-            'timeline': timeline,
-            'timeline_type': timelineType
-        });
     });
 }
 
@@ -172,14 +211,14 @@ function renderTimelineInput(timelineType, timeline) {
     var value = '';
     if (timeline != null && timeline != '') value = "value='"+timeline+"'";
 
-    if (timelineType == 'widget_timeline') {
+    if (timelineType == timeline_types.widget) {
         html += "<p class='label'>Enter widget ID:</p>";
         html += "<input id='widget_id' class='twitter-input' type='text' "+value+" />";
     } else {
         html += "<p class='label'>Enter User Timeline:</p>";
         html += "<input id='timeline' class='twitter-input' type='text' placeholder='e.g. @twitter' "+value+" />";
     }
-    html += "<span id='error_txt' style='display: block;'></span>"
+    html += "<span id='timeline_error' class='error-txt'></span>"
 
     document.getElementById('timeline_input_container').innerHTML = html;
 }
@@ -204,7 +243,8 @@ function renderEditPage() {
     html += "</select>"
 
     html += "<div id='timeline_input_container'></div>"
-    html += "</br>";
+
+    html += "<span id='general_error' class='error-txt' style='margin-top: 10px;'></span>"
 
     html += "<button id='saveButton' onclick='saveTimeline()'>Save</button>";
     html += "<button id='cancelButton' onclick='cancelEdit()'>Cancel</button>";
@@ -219,7 +259,7 @@ function renderEditPage() {
     html += "<div id='hidden_div' style='display: none;'></div>"
 
     htmlHeader += "<h3>Settings:</h3>";
-    htmlHeader += "<div class='help'><a href='https://jam4.sapjam.com/wiki/show/2ZrYD1OhdVispcr5bSzf1T' target='_blank' title='Help'><div id='help_icon'></div></a></div>";
+    htmlHeader += "<div class='help'><a href='https://jam4.sapjam.com/wiki/show/qojyAjMfMCnCplFPeS2KUM' target='_blank' title='Help'><div id='help_icon'></div></a></div>";
 
 
     document.getElementById('body').innerHTML = html;
@@ -263,7 +303,8 @@ function insertTimeline() {
     var target = {};
     var options = {};
     var state = getState();
-    if (state.timelineType == 'widget_timeline') {
+    var is_widget_timeline = (state.timelineType == timeline_types.widget);
+    if (is_widget_timeline) {
         target = {sourceType: 'widget', widgetId: state.timeline};
         options = {width: '100%'};
     } else {
@@ -272,7 +313,7 @@ function insertTimeline() {
 
     twttr.widgets.createTimeline(target, body, options).then(function(f) {
         twttr.ready(function (twttr) {
-            if (state.timelineType == 'widget_timeline') {
+            if (is_widget_timeline) {
                 adjustSize();
             } else {
                 adjustSize(500);
